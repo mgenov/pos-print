@@ -1,7 +1,16 @@
 package com.clouway.pos.print.printer;
 
 
-import com.clouway.pos.print.core.*;
+import com.clouway.pos.print.core.FiscalPolicy;
+import com.clouway.pos.print.core.IOChannel;
+import com.clouway.pos.print.core.PeriodType;
+import com.clouway.pos.print.core.PrintReceiptResponse;
+import com.clouway.pos.print.core.Receipt;
+import com.clouway.pos.print.core.ReceiptItem;
+import com.clouway.pos.print.core.ReceiptPrinter;
+import com.clouway.pos.print.core.RegisterState;
+import com.clouway.pos.print.core.RequestTimeoutException;
+import com.clouway.pos.print.core.WarningChannel;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Bytes;
 import org.jetbrains.annotations.NotNull;
@@ -201,6 +210,18 @@ public class FP705Printer implements ReceiptPrinter {
     outputStream.close();
   }
 
+  @Override
+  public void tryToCloseOpenReceipts() {
+    WarningChannel channel = createChannel(maxRetries);
+
+    try {
+      finalizeNotCompletedOperations(SEQ_START, channel);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+
   /**
    * Gets status of the printer. If printer has errors the result be a list of errors which are
    * encountered. If returned list of empty then the result is OK for the cash register.
@@ -342,7 +363,7 @@ public class FP705Printer implements ReceiptPrinter {
 
   @NotNull
   private WarningChannel createChannel(int maxRetries) {
-    return new WarningChannel(new IOChannel(inputStream, outputStream,maxRetries), new HashSet<>());
+    return new WarningChannel(new IOChannel(inputStream, outputStream, maxRetries), new HashSet<>());
   }
 
   private void finalizeNotCompletedOperations(byte seq, WarningChannel channel) throws IOException {

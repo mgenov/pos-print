@@ -51,4 +51,6 @@ public interface ReceiptPrinter {
    * @throws IOException in case of failure
    */
   void close() throws IOException;
+
+  void tryToCloseOpenReceipts();
 }

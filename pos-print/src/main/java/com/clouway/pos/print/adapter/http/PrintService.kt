@@ -9,7 +9,9 @@ import com.google.sitebricks.At
 import com.google.sitebricks.headless.Reply
 import com.google.sitebricks.headless.Request
 import com.google.sitebricks.headless.Service
+import com.google.sitebricks.http.Delete
 import com.google.sitebricks.http.Post
+import org.slf4j.LoggerFactory
 import java.io.IOException
 import javax.inject.Inject
 
@@ -19,6 +21,7 @@ import javax.inject.Inject
 @Service
 @At("/v1/receipts/req/print")
 class PrintService @Inject constructor(private var factory: PrinterFactory) {
+  private val logger = LoggerFactory.getLogger(PrintService::class.java)
 
   @Post
   fun printReceipt(request: Request): Reply<*> {
@@ -54,6 +57,43 @@ class PrintService @Inject constructor(private var factory: PrinterFactory) {
       Reply.with(response).`as`(GsonTransport::class.java).badRequest()
     }
   }
+
+  // curl -H "Content-Type: application/json" -X DELETE -d '{"sourceIp":"91.92.249.20"}' https://pos.tng.thezone.bg/v1/receipts/req/print
+
+
+
+  @Delete
+  fun closeReceipt(request: Request): Reply<*> {
+    try {
+      val request = request.read(CloseReceiptDTO::class.java).`as`(GsonTransport::class.java)
+      println("closing receipt of: ${request.sourceIp}")
+      val printer = factory.getPrinter(request.sourceIp)
+      return try {
+        println("Trying to close receipt of: ${request.sourceIp}")
+        printer.tryToCloseOpenReceipts()
+
+        Reply.saying<Any>().ok()
+      } catch (e: RequestTimeoutException) {
+        println("timeout during request for ${request.sourceIp}")
+        Reply.with(ErrorResponse("Printer request timeout.\n" + e.message)).`as`(GsonTransport::class.java).status(504)
+      } finally {
+        printer.close()
+      }
+    } catch (e: DeviceNotFoundException) {
+      e.printStackTrace()
+      println("unknown device")
+      return Reply.with(ErrorResponse("Device not found.")).`as`(GsonTransport::class.java).notFound()
+    } catch (e: IOException) {
+      println("got io error...")
+      logger.debug("got io error", e)
+      return Reply.with(ErrorResponse("Device can't connect.")).`as`(GsonTransport::class.java).status(480)
+    }
+  }
+
+  internal data class CloseReceiptDTO(val sourceIp: String = "") {
+    constructor() : this("")
+  }
+
 
   internal data class PrintReceiptRequestDTO(val sourceIp: String = "", val operatorId: String = "", val fiscal: Boolean = false, val receipt: ReceiptDTO = ReceiptDTO())
 
